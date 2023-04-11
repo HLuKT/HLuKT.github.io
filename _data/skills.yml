@@ -2,18 +2,12 @@
   keywords:
       - Java
       - C++
-      - Python
-      - Design Patterns
-
-- name: Mobile Developer Keywords
-  keywords:
-      - Android
-      - Reverse Engineering
+      - Rust
+      - ASM
 
 - name: Windows Developer Keywords
   keywords:
       - Win32 SDK
-      - DuiLib
+      - MFC
       - WTL
-      - COM
       - WinDbg
