@@ -131,7 +131,7 @@ int main()
 
 ## 原理
 
-&[ensp](https://so.csdn.net/so/search?q=ensp&spm=1001.2101.3001.7020);&[ensp](https://so.csdn.net/so/search?q=ensp&spm=1001.2101.3001.7020);由于线程初始化时会调用 ntdll 未导出函数 NtTestAlert，NtTestAlert 是一个检查当前线程的 APC 队列的函数，如果有任何队列作业，它会清空队列。当线程启动时，NtTestAlert 会首先被调用。因此，如果在线程的开始状态下对 APC 进行操作，调用 NtTestAlert 函数就可以确保执行我们的 shellcode。
+由于线程初始化时会调用 ntdll 未导出函数 NtTestAlert，NtTestAlert 是一个检查当前线程的 APC 队列的函数，如果有任何队列作业，它会清空队列。当线程启动时，NtTestAlert 会首先被调用。因此，如果在线程的开始状态下对 APC 进行操作，调用 NtTestAlert 函数就可以确保执行我们的 shellcode。
 
 ## 实现流程
 
