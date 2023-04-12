@@ -8,7 +8,7 @@ keywords: Windows，注入，免杀
 
 远程线程注入技术
 
-# 一、PE注入
+# 一、Shellcode注入
 
 ## 1.获取目标进程句柄
 

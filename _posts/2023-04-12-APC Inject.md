@@ -1,8 +1,18 @@
+---
+layout: post
+title: APC Inject
+categories: Inject
+description: Inject 之 APC
+keywords: Windows，注入，免杀
+---
+
+APC注入技术
+
 # APC Inject
 
 ## 原理
 
-&[ensp](https://so.csdn.net/so/search?q=ensp&spm=1001.2101.3001.7020);&[ensp](https://so.csdn.net/so/search?q=ensp&spm=1001.2101.3001.7020);APC是一个简称，即“异步过程调用”。APC 注入的原理是利用当线程被唤醒时，APC 中的注册函数会被执行，并以此去执行 DLL 的加载代码，进而完成 DLL 注入的目的。在线程下一次被调度的时候，就会执行 APC 函数，APC 有两种形式，由系统产生的 APC 称为内核模式 APC，由应用程序产生的 APC 被称为用户模式 APC。
+APC是一个简称，即“异步过程调用”。APC 注入的原理是利用当线程被唤醒时，APC 中的注册函数会被执行，并以此去执行 DLL 的加载代码，进而完成 DLL 注入的目的。在线程下一次被调度的时候，就会执行 APC 函数，APC 有两种形式，由系统产生的 APC 称为内核模式 APC，由应用程序产生的 APC 被称为用户模式 APC。
 
 ## 实现流程
 
@@ -12,13 +22,13 @@
 
 ## 缺点
 
-&[ensp](https://so.csdn.net/so/search?q=ensp&spm=1001.2101.3001.7020);&[ensp](https://so.csdn.net/so/search?q=ensp&spm=1001.2101.3001.7020);当用户模式 APC 队列时，除非线程处于可警报状态，否则不会定向线程调用 APC 函数。
+当用户模式 APC 队列时，除非线程处于可警报状态，否则不会定向线程调用 APC 函数。
 
-&[ensp](https://so.csdn.net/so/search?q=ensp&spm=1001.2101.3001.7020);&[ensp](https://so.csdn.net/so/search?q=ensp&spm=1001.2101.3001.7020);线程处于可警报状态后，线程将按先进先出 （FIFO） 顺序处理所有挂起的 APC，等待操作将返回WAIT_IO_COMPLETION。
+线程处于可警报状态后，线程将按先进先出 （FIFO） 顺序处理所有挂起的 APC，等待操作将返回WAIT_IO_COMPLETION。
 
-&[ensp](https://so.csdn.net/so/search?q=ensp&spm=1001.2101.3001.7020);&[ensp](https://so.csdn.net/so/search?q=ensp&spm=1001.2101.3001.7020);线程通过使用 SleepEx 函数、SignalObjectAndWait 函数、WaitForSingleObjectEx 函数、WaitForMultipleObjectsEx 函数或 MsgWaitForMultipleObjectsEx 函数进入可报警状态。
+线程通过使用 SleepEx 函数、SignalObjectAndWait 函数、WaitForSingleObjectEx 函数、WaitForMultipleObjectsEx 函数或 MsgWaitForMultipleObjectsEx 函数进入可报警状态。
 
-https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-queueuserapc
+[QueueUserAPC function](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-queueuserapc)
 
 ## 完整代码
 
