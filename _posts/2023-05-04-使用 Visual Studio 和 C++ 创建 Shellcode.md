@@ -32,7 +32,9 @@ keywords: C\C++,Shellcode
 
  `code_gen `依赖于 CRT 和 Windows Kernel，按照以下步骤使其独立。
 
-1.添加一个 .cpp（不是 .c）文件到 `code_gen `并写入以下代码：
+### 1.创建 cpp 文件
+
+添加一个 .cpp（不是 .c）文件到 `code_gen `并写入以下代码：
 
 ```cpp
 // code.cpp
@@ -42,7 +44,9 @@ extern "C" bool _code()
 }
 ```
 
-2.打开`code_gen `项目属性并配置以下选项：
+### 2.配置项目属性
+
+打开`code_gen `项目属性并配置以下选项：
 
 高级 > 使用调试库：否
 
@@ -117,7 +121,7 @@ extern "C" int _code(int x, int y)
 
 我们只需要 .dll 和 .map 文件，我们的 DLL 文件包含汇编的 x64 机器代码，我们的映射文件包含有关链接器使用的地址的信息，但映射文件中最重要的是代码在我们的代码映射的虚拟内存空间中的地址和偏移量。
 
-1.使用 LordPE 打开 code_gen.dll
+### 1.使用 LordPE 打开 code_gen.dll
 
 ![DataDirectory](https://HLuKT.github.io/images/posts/blog/CreateShellcode/DataDirectory.png)
 
@@ -127,6 +131,85 @@ extern "C" int _code(int x, int y)
 
 ![SectionTable](https://HLuKT.github.io/images/posts/blog/CreateShellcode/SectionTable.png)
 
-2.使用 010Editor 打开 code_gen.dll
+### 2.使用 010Editor 打开 code_gen.dll
 
 ![010Offset](https://HLuKT.github.io/images/posts/blog/CreateShellcode/010Offset.png)
+
+C3 opcode 表示 RETURN，表明它是我们函数的结尾，不需要 zero bytes (\0)
+
+### 3.复制为C代码
+
+选中字节并从菜单栏编辑 -> 复制为 -> 复制为C代码，并粘贴到 main.cpp 中，代码如下所示：
+
+```cpp
+// main.cpp
+#include <windows.h>
+#include <iostream>
+using namespace std;
+
+unsigned char hexData[9] = {
+    0x8D, 0x42, 0x01, 0x0F, 0xAF, 0xC1, 0x03, 0xC2, 0xC3
+};
+
+int main()
+{
+    return EXIT_SUCCESS;
+}
+```
+
+### 4.创建函数类型定义
+
+创建函数类型定义，在全局范围内添加这段代码：
+
+```cpp
+typedef int(*_code_t)(int, int);
+```
+
+### 5.将原始代码访问标志设置为可执行
+
+将原始代码访问标志设置为可执行，以便 CPU 可以执行它，在 main 中添加此代码：
+
+```c++
+    DWORD old_flag;
+    VirtualProtect(hexData, sizeof hexData, PAGE_EXECUTE_READWRITE, &old_flag);
+```
+
+### 6.执行代码
+
+最后一步是执行，在返回前添加以下代码：
+
+```cpp
+    _code_t fn_code = (_code_t)(void*)hexData;
+    int x = 500; int y = 1200;
+    printf("Result of function : %d\n", fn_code(x, y));
+```
+
+### 7.运行
+
+构建 `code_tester `并运行，代码如下：
+
+```cpp
+// main.cpp
+#include <windows.h>
+#include <iostream>
+using namespace std;
+typedef int(*_code_t)(int, int);
+
+unsigned char hexData[9] = {
+    0x8D, 0x42, 0x01, 0x0F, 0xAF, 0xC1, 0x03, 0xC2, 0xC3
+};
+
+int main()
+{
+    DWORD old_flag;
+    VirtualProtect(hexData, sizeof hexData, PAGE_EXECUTE_READWRITE, &old_flag);
+    _code_t fn_code = (_code_t)(void*)hexData;
+    int x = 500; int y = 1200;
+    printf("Result of function : %d\n", fn_code(x, y));
+    return EXIT_SUCCESS;
+}
+```
+
+运行结果如下：
+
+![Result](https://HLuKT.github.io/images/posts/blog/CreateShellcode/Result.png)
