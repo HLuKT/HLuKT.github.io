@@ -6,7 +6,9 @@ description: 使用 Visual Studio 和 C++ 创建 Shellcode
 keywords: C\C++,Shellcode
 ---
 
-# 使用 Visual Studio 和 C++ 创建 Shellcode
+使用 Visual Studio 和 C++ 创建 Shellcode
+
+# 基本方法
 
 ## 1.所需工具和软件
 
@@ -184,7 +186,7 @@ typedef int(*_code_t)(int, int);
     printf("Result of function : %d\n", fn_code(x, y));
 ```
 
-### 7.运行
+### 7.运行程序
 
 构建 `code_tester `并运行，代码如下：
 
@@ -213,3 +215,90 @@ int main()
 运行结果如下：
 
 ![Result](https://HLuKT.github.io/images/posts/blog/CreateShellcode/Result.png)
+
+# 进阶方法
+
+在上面的简单实现中，涉及到的代码十分基础，但当涉及到更复杂的代码，如压缩、加密、许可证检查等时，我们需要 .map 文件使得代码可以在任何地址获取其偏移量。
+
+同样，在基本方法中，我们没有使用任何 CRT 或 Windows API，但在实际使用情况中，我们非常需要它们，所以我们也必须解决这个问题。
+
+接下来将创建两个shellcode，一个用于加密缓冲区，一个用于解密缓冲区。
+
+## 1.添加AES加密库
+
+克隆[tiny-AES-c](https://github.com/kokke/tiny-AES-c)AES加密库，复制aes.c 和 aes.h到项目中。
+
+## 2.添加头文件
+
+将代码.cpp更改为：
+
+```cpp
+// code.cpp
+extern "C"
+{
+    #include "aes.h"
+    bool _encrypt(void* data, size_t size)
+    {
+        // Encryption Code Area //
+        return true;
+    }
+}
+```
+
+## 3.添加加密代码
+
+编写加密代码并且不要在堆栈上使用任何数据，编译后DLL文件中不得有.data部分
+
+以下是加密代码：
+
+```cpp
+// code.cpp
+extern "C"
+{
+#include "aes.h"
+    bool _encrypt(void* data, size_t size)
+    {
+        // Allocate data on heap
+        struct AES_ctx ctx;
+        unsigned char key[32] = {
+        0xBB, 0x17, 0xCA, 0x8C, 0x69, 0x7F, 0xA1, 0x89,
+        0x3B, 0xCF, 0xA8, 0x12, 0x34, 0x6F, 0xB6, 0xE8,
+        0x79, 0x89, 0xDA, 0xD0, 0x0B, 0xA9, 0xA1, 0x1B,
+        0x5B, 0x38, 0xD0, 0x4A, 0x20, 0x4D, 0xB8, 0x0E };
+        unsigned char iv[16] = {
+        0xA3, 0xF3, 0xD4, 0xC5, 0x5E, 0xCD, 0x41, 0xA6,
+        0x22, 0xC9, 0x8D, 0xE5, 0xA3, 0xBB, 0x29, 0xF1 };
+
+        // Initialize encrypt context
+        AES_init_ctx_iv(&ctx, key, iv);
+
+        // Encrypt buffer
+        AES_CBC_encrypt_buffer(&ctx, (uint8_t*)data, size);
+        return true;
+    }
+}
+```
+
+## 4.编译后查看code_gen.dll
+
+![Addrdata](https://HLuKT.github.io/images/posts/blog/CreateShellcode/Addrdata.png)
+
+可见，DLL中添加了一个 .rdata 段，该部分由 `tiny-aes-c` 为 `sbox `和 `rsbox` 查找表生成，没有这些数据就无法使机器代码工作。
+
+## 5.合并区段
+
+```cpp
+#pragma comment(linker, "/merge:.rdata=.text")
+```
+
+## 6.再次编译
+
+再次编译，用LordPE打开code_gen.dll：
+
+![pdata](https://HLuKT.github.io/images/posts/blog/CreateShellcode/pdata.png)
+
+可知 .rdata 段合并到了 .text 段
+
+## 7.将 .text 段复制为 C 代码
+
+使用 010Editor 打开 code_gen.dll，选中字节并从菜单栏编辑 -> 复制为 -> 复制为C代码
