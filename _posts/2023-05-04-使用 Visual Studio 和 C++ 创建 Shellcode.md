@@ -258,7 +258,7 @@ extern "C"
 #include "aes.h"
     bool _encrypt(void* data, size_t size)
     {
-        // Allocate data on heap
+        // 在堆上分配空间
         struct AES_ctx ctx;
         unsigned char key[32] = {
         0xBB, 0x17, 0xCA, 0x8C, 0x69, 0x7F, 0xA1, 0x89,
@@ -269,7 +269,7 @@ extern "C"
         0xA3, 0xF3, 0xD4, 0xC5, 0x5E, 0xCD, 0x41, 0xA6,
         0x22, 0xC9, 0x8D, 0xE5, 0xA3, 0xBB, 0x29, 0xF1 };
 
-        // Initialize encrypt context
+        // 初始化加密上下文
         AES_init_ctx_iv(&ctx, key, iv);
 
         // Encrypt buffer
@@ -301,4 +301,184 @@ extern "C"
 
 ## 7.将 .text 段复制为 C 代码
 
-使用 010Editor 打开 code_gen.dll，选中字节并从菜单栏编辑 -> 复制为 -> 复制为C代码
+使用 010Editor 打开 code_gen.dll，Ctrl+G 跳转到 .text 段，Ctrl+Shift+A 输入 .text 段原始大小，选中字节并从菜单栏编辑 -> 复制为 -> 复制为C代码，粘贴到头文件并添加到 code_tester 项目中。
+
+> 为了便于代码提取，可以直接右键单击 LordPE 中的 .text 并选择 16进制编辑区段，可能会产生额外的大小，所以最好手动输入区段大小。
+
+## 8.添加Shellcode
+
+将 `code_tester` main.cpp 文件更改为：
+
+```
+// main.cpp
+#include <windows.h>
+#include <stdio.h>
+#include <fstream>
+#include <vector>
+#include"Shellcode.h"
+using namespace std;
+typedef bool(*_encrypt)(void*, size_t);
+
+#define ENC_SC_RAW hexData
+#define FUNCTION_OFFSET 0x1220
+
+int main(int argc, char* argv[])
+{
+    // 检查命令参数个数
+    if (argc != 4) return EXIT_FAILURE;
+
+    // 获取命令参数
+    char* input_file = argv[1];
+    char* process_mode = argv[2];
+    char* output_file = argv[3];
+
+    // 更改内存属性为可读可写可执行
+    DWORD old_flag;
+    VirtualProtect(ENC_SC_RAW, sizeof ENC_SC_RAW, PAGE_EXECUTE_READWRITE, &old_flag);
+
+    // 声明加密函数
+    _encrypt encrypt = (_encrypt)(void*)&ENC_SC_RAW[FUNCTION_OFFSET];
+
+    // 将输入文件读入 vector 缓冲区
+    ifstream input_file_reader(argv[1], ios::binary);
+    vector<uint8_t> input_file_buffer(istreambuf_iterator<char>(input_file_reader), {});
+
+    //向输入文件数据添加填充，此处采用 00 填充
+    for (size_t i = 0; i < 16; i++)
+        input_file_buffer.insert(input_file_buffer.begin(), 0x0);
+    for (size_t i = 0; i < 16; i++) input_file_buffer.push_back(0x0);
+
+    // 加密文件缓冲区
+    if (strcmp(process_mode, "-e") == 0) encrypt(input_file_buffer.data(),
+        input_file_buffer.size());
+
+    // 将加密缓冲区保存到输出文件
+    fstream file_writter;
+    file_writter.open(output_file, ios::binary | ios::out);
+    file_writter.write((char*)input_file_buffer.data(), input_file_buffer.size());
+    file_writter.close();
+
+    // 代码执行成功
+    printf("OK"); return EXIT_SUCCESS;
+}
+```
+
+## 9.获取地址偏移量
+
+用文本编辑器打开code_gen.map，找到shellcode中 `_encrypt `函数的地址偏移量，搜索 `_encrypt`，可知虚拟偏移量是 0x2220。
+
+![VirOffset](https://HLuKT.github.io/images/posts/blog/CreateShellcode/VirOffset.png)
+
+## 10.计算实际偏移量
+
+返回 LordPE 并检查 .text 段的虚拟地址，即 0x1000，减去虚拟地址，得到 0x12C0，即实际的偏移量，替换代码中的值：
+
+```cpp
+#define FUNCTION_OFFSET 0x1220
+```
+
+## 11.编译并测试加密
+
+```cpp
+code_tester.exe 1.jpg -e encrypted.jpg
+```
+
+## 12.生成解密Shellcode
+
+步骤如下：
+
+1.生成解密Shellcode
+
+使用 `AES_CBC_decrypt_buffer`而不是 `AES_CBC_encrypt_buffer`
+
+```cpp
+	// Decrypt buffer
+	AES_CBC_decrypt_buffer(&ctx, (uint8_t*)data, size);
+```
+
+2.修改类型定义
+
+```cpp
+typedef bool(*_crypt)(void*, size_t);
+```
+
+以下是 main.cpp 代码：
+
+```
+// main.cpp
+#include <windows.h>
+#include <stdio.h>
+#include <fstream>
+#include <vector>
+#include"Encrypt.h"
+#include"Decrypt.h"
+using namespace std;
+typedef bool(*_crypt)(void*, size_t);
+
+#define ENC_SC_RAW EncryptData
+#define DEC_SC_RAW DecryptData
+#define FUNCTION_OFFSET 0x1220
+
+int main(int argc, char* argv[])
+{
+    // 检查命令参数个数
+    if (argc != 4) return EXIT_FAILURE;
+
+    // 获取命令参数
+    char* input_file = argv[1];
+    char* process_mode = argv[2];
+    char* output_file = argv[3];
+
+    // 判断模式
+    if (strcmp(process_mode, "-e") != 0 &&
+        strcmp(process_mode, "-d") != 0) return EXIT_FAILURE;
+
+    // 更改内存属性为可读可写可执行
+    DWORD old_flag;
+    VirtualProtect(ENC_SC_RAW, sizeof ENC_SC_RAW, PAGE_EXECUTE_READWRITE, &old_flag);
+    VirtualProtect(DEC_SC_RAW, sizeof DEC_SC_RAW, PAGE_EXECUTE_READWRITE, &old_flag);
+
+    // 声明加密函数
+    _crypt encrypt = (_crypt)(void*)&ENC_SC_RAW[FUNCTION_OFFSET];
+    _crypt decrypt = (_crypt)(void*)&DEC_SC_RAW[FUNCTION_OFFSET];
+
+    // 将输入文件读入 vector 缓冲区
+    ifstream input_file_reader(argv[1], ios::binary);
+    vector<uint8_t> input_file_buffer(istreambuf_iterator<char>(input_file_reader), {});
+
+    //向输入文件数据添加填充，此处采用 00 填充
+    if (strcmp(process_mode, "-d") == 0) goto SKIP_PADDING;
+    for (size_t i = 0; i < 16; i++)
+        input_file_buffer.insert(input_file_buffer.begin(), 0x0);
+    for (size_t i = 0; i < 16; i++) input_file_buffer.push_back(0x0);
+
+
+    // 加密/解密文件缓冲区
+    SKIP_PADDING:
+    if (strcmp(process_mode, "-e") == 0) encrypt(input_file_buffer.data(),
+        input_file_buffer.size());
+    if (strcmp(process_mode, "-d") == 0) decrypt(input_file_buffer.data(),
+        input_file_buffer.size());
+
+    // 将加密缓冲区保存到输出文件
+    fstream file_writter;
+    file_writter.open(output_file, ios::binary | ios::out);
+    if (strcmp(process_mode, "-e") == 0)
+        file_writter.write((char*)input_file_buffer.data(), input_file_buffer.size());
+    if (strcmp(process_mode, "-d") == 0)
+        file_writter.write((char*)&input_file_buffer[16],
+            input_file_buffer.size() - 32);
+    file_writter.close();
+
+    // 代码执行成功
+    printf("OK"); return EXIT_SUCCESS;
+}
+```
+
+## 13.编译并测试解密
+
+```cpp
+code_tester.exe encrypted.jpg -d decrypted.jpg
+```
+
+解密成功！
