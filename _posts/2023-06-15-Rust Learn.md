@@ -8,6 +8,8 @@ keywords: Rust
 
 # Rust Learn
 
+Rust 学习记录
+
 ## Trait
 
 ### trait对象动态分发
