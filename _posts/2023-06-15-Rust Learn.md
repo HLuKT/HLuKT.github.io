@@ -2,7 +2,7 @@
 layout: post
 title: Rust Learn
 categories: Rust
-description: Rust Learn
+description: Rust学习记录
 keywords: Rust
 ---
 
